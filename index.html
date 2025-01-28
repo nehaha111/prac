@@ -169,12 +169,23 @@
         });
     }
 
-   const lexSettings = {
+  const lexSettings = {
     botName: 'TaskManagerBot',  // Your Lex bot name
     botAlias: 'TSTALIASID',     // Your Lex bot alias
     region: 'us-west-2',        // Your AWS region
     identityPoolId: 'us-west-2:0177e1c7-4f8b-43b7-b9c9-d5593334ca5a'  // Your Cognito Identity Pool ID
 };
+
+// Lex Web UI
+AWS.config.region = lexSettings.region;
+const lexWebUi = new LexWebUi({
+    botName: lexSettings.botName,
+    botAlias: lexSettings.botAlias,
+    region: lexSettings.region,
+    identityPoolId: lexSettings.identityPoolId
+});
+
+lexWebUi.init();  // Initialize Lex Web UI
 
 
     const chatWidget = new AmazonLexWebUi.Widget(lexSettings);
