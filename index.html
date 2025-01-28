@@ -44,7 +44,7 @@
       })
     });
 
-    // Amazon Lex configuration
+    const dynamoDB = new AWS.DynamoDB.DocumentClient();
     const lexRuntime = new AWS.LexRuntime();
 
     function sendMessage() {
@@ -70,9 +70,9 @@
 
           // Handle Lex responses
           if (data.intentName === 'AddTask') {
-            addTaskToList(data.slots.TaskName);
+            addTaskToDynamoDB(data.slots.TaskName);
           } else if (data.intentName === 'ViewTasks') {
-            viewTasks();
+            viewTasksFromDynamoDB();
           } else if (data.intentName === 'MarkTask') {
             markTaskCompleted(data.slots.TaskName);
           }
@@ -87,44 +87,65 @@
       chat.appendChild(messageDiv);
     }
 
-    let tasks = [];
+    function addTaskToDynamoDB(taskName) {
+      const params = {
+        TableName: 'TasksTable',
+        Item: {
+          TaskID: Date.now().toString(),  // Use timestamp for unique TaskID
+          TaskName: taskName,
+          Status: 'Pending'
+        }
+      };
 
-    function addTaskToList(taskName) {
-      tasks.push({ name: taskName, completed: false });
-      renderTasks();
+      dynamoDB.put(params, function(err, data) {
+        if (err) {
+          console.log('Error adding task to DynamoDB:', err);
+          displayMessage('There was an error adding the task.');
+        } else {
+          displayMessage(`Task "${taskName}" added successfully.`);
+        }
+      });
     }
 
-    function viewTasks() {
-      let taskListMessage = 'Here are your tasks:\n';
-      tasks.forEach(task => {
-        taskListMessage += `${task.name} - ${task.completed ? 'Completed' : 'Pending'}\n`;
+    function viewTasksFromDynamoDB() {
+      const params = {
+        TableName: 'TasksTable'
+      };
+
+      dynamoDB.scan(params, function(err, data) {
+        if (err) {
+          console.log('Error fetching tasks from DynamoDB:', err);
+          displayMessage('There was an error fetching the tasks.');
+        } else {
+          let taskListMessage = 'Here are your tasks:\n';
+          data.Items.forEach(task => {
+            taskListMessage += `${task.TaskName} - ${task.Status}\n`;
+          });
+          displayMessage(taskListMessage);
+        }
       });
-      displayMessage(taskListMessage);
     }
 
     function markTaskCompleted(taskName) {
-      const task = tasks.find(t => t.name === taskName);
-      if (task) {
-        task.completed = true;
-        renderTasks();
-        displayMessage(`Task "${taskName}" marked as completed.`);
-      } else {
-        displayMessage(`Task "${taskName}" not found.`);
-      }
-    }
+      // Fetch task from DynamoDB, update status to 'Completed'
+      const params = {
+        TableName: 'TasksTable',
+        Key: { TaskName: taskName },
+        UpdateExpression: 'set #status = :status',
+        ExpressionAttributeNames: { '#status': 'Status' },
+        ExpressionAttributeValues: { ':status': 'Completed' }
+      };
 
-    function renderTasks() {
-      const taskList = document.getElementById('taskList');
-      taskList.innerHTML = '';
-      tasks.forEach(task => {
-        const taskDiv = document.createElement('div');
-        taskDiv.classList.add('task');
-        taskDiv.innerHTML = `${task.name} - ${task.completed ? 'Completed' : 'Pending'}`;
-        taskList.appendChild(taskDiv);
+      dynamoDB.update(params, function(err, data) {
+        if (err) {
+          console.log('Error marking task completed in DynamoDB:', err);
+          displayMessage(`There was an error marking "${taskName}" as completed.`);
+        } else {
+          displayMessage(`Task "${taskName}" marked as completed.`);
+        }
       });
     }
   </script>
 
 </body>
 </html>
-
