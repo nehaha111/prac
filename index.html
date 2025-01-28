@@ -3,194 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Management App</title>
-    <script src="https://cdn.jsdelivr.net/npm/aws-sdk@2.1020.0/dist/aws-sdk.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/amazon-lex-web-ui@1.1.0/dist/amazon-lex-web-ui.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            background-color: #f0f0f0;
-        }
-        h1 {
-            text-align: center;
-        }
-        .task-form, .task-table, .chat-box {
-            margin-top: 20px;
-        }
-        .task-form input, .task-form select, .task-form textarea {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        .task-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .task-table th, .task-table td {
-            padding: 10px;
-            text-align: left;
-        }
-        .task-table tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
-        .chat-box {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            width: 300px;
-            height: 400px;
-            background-color: white;
-            border: 1px solid #ccc;
-            padding: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .chat-box iframe {
-            width: 100%;
-            height: 100%;
-        }
-    </style>
+    <title>Task Manager</title>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1194.0.min.js"></script>
+    <script src="https://lex-web-ui.us-east-1.amazonaws.com/v1.js"></script> <!-- Use correct region -->
 </head>
 <body>
+    <h1>Task Management</h1>
 
-<h1>Task Management App</h1>
+    <!-- Chatbot UI for Lex -->
+    <div id="chatbot"></div>
 
-<!-- Task Form -->
-<div class="task-form">
-    <h2>Add Task</h2>
-    <form id="taskForm">
-        <input type="text" id="title" placeholder="Task Title" required>
-        <textarea id="description" placeholder="Task Description" required></textarea>
-        <input type="date" id="deadline" required>
-        <select id="team" required>
-            <option value="Development">Development</option>
-            <option value="Design">Design</option>
-            <option value="QA">Quality Assurance</option>
-        </select>
-        <select id="priority" required>
-            <option value="Low">Low</option>
-            <option value="Medium">Medium</option>
-            <option value="High">High</option>
-        </select>
-        <button type="submit">Add Task</button>
-    </form>
-</div>
-
-<!-- Task Table -->
-<div class="task-table">
-    <h2>Task List</h2>
-    <table id="taskTable">
-        <thead>
-            <tr>
-                <th>Title</th>
-                <th>Description</th>
-                <th>Deadline</th>
-                <th>Team</th>
-                <th>Priority</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Task rows will be inserted here -->
-        </tbody>
-    </table>
-</div>
-
-<!-- Chat Box (Amazon Lex) -->
-<div class="chat-box" id="chatBox">
-    <iframe id="chatIframe" src="https://lex-web-ui.us-east-1.amazonaws.com/"></iframe>
-</div>
-
-<script>
-    AWS.config.update({
-        region: 'us-west-2', // replace with your AWS region
-        credentials: new AWS.CognitoIdentityCredentials({
-            IdentityPoolId: 'us-west-2:YOUR_IDENTITY_POOL_ID', // replace with your Identity Pool ID
-        })
-    });
-
-    const dynamoDB = new AWS.DynamoDB.DocumentClient();
-    const lexruntime = new AWS.LexRuntime();
-    const taskTableName = 'Tasks'; // Replace with your DynamoDB table name
-
-    // Handle Add Task Form Submission
-    document.getElementById('taskForm').addEventListener('submit', function(event) {
-        event.preventDefault();
-
-        const task = {
-            title: document.getElementById('title').value,
-            description: document.getElementById('description').value,
-            deadline: document.getElementById('deadline').value,
-            team: document.getElementById('team').value,
-            priority: document.getElementById('priority').value
+    <script>
+        // Lex Bot Configuration
+        const lexSettings = {
+            botName: 'TaskManagerBot',  // Your Lex Bot name
+            botAlias: 'TSTALIASID',     // Your Lex Bot Alias
+            region: 'us-west-2',        // AWS region
+            identityPoolId: 'us-west-2:0177e1c7-4f8b-43b7-b9c9-d5593334ca5a'  // Cognito Identity Pool ID
         };
 
-        addTaskToDynamoDB(task);
-    });
-
-    // Function to Add Task to DynamoDB
-    function addTaskToDynamoDB(task) {
-        const params = {
-            TableName: taskTableName,
-            Item: task
-        };
-
-        dynamoDB.put(params, function(err, data) {
-            if (err) {
-                console.log("Error adding task to DynamoDB:", err);
-            } else {
-                console.log("Task added successfully:", data);
-                renderTaskTable();
-            }
+        // Initialize Lex Web UI
+        const lexWebUi = new LexWebUi({
+            botName: lexSettings.botName,
+            botAlias: lexSettings.botAlias,
+            region: lexSettings.region,
+            identityPoolId: lexSettings.identityPoolId
         });
-    }
 
-    // Render the Task Table with Tasks from DynamoDB
-    function renderTaskTable() {
-        const params = {
-            TableName: taskTableName
-        };
+        lexWebUi.init();  // Initialize the Lex Web UI
 
-        dynamoDB.scan(params, function(err, data) {
-            if (err) {
-                console.log("Error fetching tasks from DynamoDB:", err);
-            } else {
-                const taskTableBody = document.getElementById('taskTable').getElementsByTagName('tbody')[0];
-                taskTableBody.innerHTML = ''; // Clear previous tasks
-
-                data.Items.forEach(task => {
-                    const row = taskTableBody.insertRow();
-                    row.insertCell(0).textContent = task.title;
-                    row.insertCell(1).textContent = task.description;
-                    row.insertCell(2).textContent = task.deadline;
-                    row.insertCell(3).textContent = task.team;
-                    row.insertCell(4).textContent = task.priority;
-                });
-            }
+        // Example: Task storage using DynamoDB
+        AWS.config.update({
+            region: lexSettings.region
         });
-    }
 
-  const lexSettings = {
-    botName: 'TaskManagerBot',  // Your Lex bot name
-    botAlias: 'TSTALIASID',     // Your Lex bot alias
-    region: 'us-west-2',        // Your AWS region
-    identityPoolId: 'us-west-2:0177e1c7-4f8b-43b7-b9c9-d5593334ca5a'  // Your Cognito Identity Pool ID
-};
+        const dynamoDB = new AWS.DynamoDB.DocumentClient();
+        
+        // Function to add a task to DynamoDB
+        function addTaskToDB(taskName) {
+            const params = {
+                TableName: "Tasks",  // Make sure you create a "Tasks" table in DynamoDB
+                Item: {
+                    TaskID: Date.now().toString(),
+                    TaskName: taskName,
+                    Status: 'Pending'
+                }
+            };
 
-// Lex Web UI
-AWS.config.region = lexSettings.region;
-const lexWebUi = new LexWebUi({
-    botName: lexSettings.botName,
-    botAlias: lexSettings.botAlias,
-    region: lexSettings.region,
-    identityPoolId: lexSettings.identityPoolId
-});
+            dynamoDB.put(params, function(err, data) {
+                if (err) {
+                    console.error("Error adding task: ", err);
+                } else {
+                    console.log("Task added successfully: ", data);
+                }
+            });
+        }
 
-lexWebUi.init();  // Initialize Lex Web UI
+        // Lex function to handle input from the user (e.g., adding a task)
+        function handleLexBotResponse(userInput) {
+            const params = {
+                botName: lexSettings.botName,
+                botAlias: lexSettings.botAlias,
+                userId: 'user123',  // Unique user ID
+                inputText: userInput
+            };
 
+            const lexRuntime = new AWS.LexRuntime();
+            lexRuntime.postText(params, function(err, data) {
+                if (err) {
+                    console.log("Error:", err);
+                } else {
+                    console.log("Lex Bot response:", data);
+                    if (data.dialogState === 'ReadyForFulfillment') {
+                        // Add task logic after Lex confirms fulfillment
+                        if (data.intentName === 'AddTaskIntent') {
+                            const taskName = data.slots.TaskName;
+                            addTaskToDB(taskName);  // Add task to DynamoDB
+                        }
+                    }
+                }
+            });
+        }
 
-    const chatWidget = new AmazonLexWebUi.Widget(lexSettings);
-    chatWidget.render();
-</script>
+        // Example: Send a message to Lex (this could be done via the UI input)
+        // For testing purposes, you can trigger this function
+        handleLexBotResponse("Add a new task to complete the project");
 
+    </script>
 </body>
 </html>
