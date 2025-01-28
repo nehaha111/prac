@@ -1,141 +1,130 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Management App</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4; }
-        h1 { text-align: center; }
-        #taskForm { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
-        #taskForm label { display: block; margin-top: 10px; }
-        #taskList table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        #taskList table, th, td { border: 1px solid #ddd; }
-        th, td { padding: 10px; text-align: left; }
-        button { background-color: #4CAF50; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; }
-        button:hover { background-color: #45a049; }
-        .delete-btn { background-color: red; }
-        .update-btn { background-color: orange; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Manager</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+    #taskList {
+      margin-top: 20px;
+    }
+    .task {
+      padding: 10px;
+      margin: 5px 0;
+      background-color: #f4f4f4;
+    }
+    button {
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
 
-<h1>Task Management App</h1>
+  <h1>Task Manager</h1>
 
-<div id="taskForm">
-    <h2>Add Task</h2>
-    <form id="taskFormData">
-        <label for="taskName">Task Name:</label>
-        <input type="text" id="taskName" required>
-        <label for="taskDescription">Description:</label>
-        <textarea id="taskDescription" required></textarea>
-        <label for="taskDeadline">Deadline:</label>
-        <input type="date" id="taskDeadline" required>
-        <label for="taskPriority">Priority:</label>
-        <select id="taskPriority" required>
-            <option value="Low">Low</option>
-            <option value="Medium">Medium</option>
-            <option value="High">High</option>
-        </select>
-        <button type="submit">Add Task</button>
-    </form>
-</div>
+  <!-- Chatbot Interface -->
+  <div id="chat">
+    <input type="text" id="chatInput" placeholder="Ask me to add, view or mark tasks..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>
 
-<div id="taskList">
-    <h2>Tasks</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Task Name</th>
-                <th>Description</th>
-                <th>Deadline</th>
-                <th>Priority</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="taskTableBody"></tbody>
-    </table>
-</div>
+  <!-- Task List -->
+  <div id="taskList"></div>
 
-<script>
-    // Function to render tasks
-    function renderTasks(tasks) {
-        const tableBody = document.getElementById('taskTableBody');
-        tableBody.innerHTML = ''; // Clear current tasks
-        tasks.forEach((task, index) => {
-            const row = tableBody.insertRow();
-            row.insertCell(0).textContent = task.name;
-            row.insertCell(1).textContent = task.description;
-            row.insertCell(2).textContent = task.deadline;
-            row.insertCell(3).textContent = task.priority;
-
-            const actionCell = row.insertCell(4);
-            actionCell.innerHTML = `
-                <button class="update-btn" onclick="editTask(${index})">Edit</button>
-                <button class="delete-btn" onclick="deleteTask(${index})">Delete</button>
-            `;
-        });
-    }
-
-    // Handle adding task
-    document.getElementById('taskFormData').addEventListener('submit', (event) => {
-        event.preventDefault();
-
-        const taskName = document.getElementById('taskName').value;
-        const taskDescription = document.getElementById('taskDescription').value;
-        const taskDeadline = document.getElementById('taskDeadline').value;
-        const taskPriority = document.getElementById('taskPriority').value;
-
-        const newTask = { name: taskName, description: taskDescription, deadline: taskDeadline, priority: taskPriority };
-
-        // Send task to backend (Amazon DynamoDB via Lambda here)
-        addTaskToDynamoDB(newTask);
-
-        // Clear form
-        document.getElementById('taskFormData').reset();
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1132.0.min.js"></script>
+  <script>
+    // Configure AWS SDK
+    AWS.config.update({
+      region: 'us-west-2',  // Update to your AWS region
+      credentials: new AWS.CognitoIdentityCredentials({
+        IdentityPoolId: 'YOUR_IDENTITY_POOL_ID', // Update with your Identity Pool ID
+      })
     });
 
-    // Example: Store task in DynamoDB using AWS SDK (add this in your Lambda)
-    function addTaskToDynamoDB(task) {
-        const AWS = require('aws-sdk');
-        AWS.config.update({ region: 'us-west-2' });
-        const docClient = new AWS.DynamoDB.DocumentClient();
+    // Amazon Lex configuration
+    const lexRuntime = new AWS.LexRuntime();
 
-        const params = {
-            TableName: 'Tasks',
-            Item: task,
-        };
+    function sendMessage() {
+      const message = document.getElementById('chatInput').value;
+      
+      // Check if the message is not empty
+      if (message.trim() === '') return;
 
-        docClient.put(params, function (err, data) {
-            if (err) {
-                console.log("Error adding task to DynamoDB: ", JSON.stringify(err, null, 2));
-            } else {
-                console.log("Task added successfully", data);
-                fetchTasks(); // Fetch and display tasks after adding
-            }
-        });
+      // Sending message to Lex
+      const params = {
+        botName: 'TaskBot', // Your Lex bot name
+        botAlias: '$LATEST',
+        userId: 'user123',  // Any unique user ID
+        inputText: message
+      };
+
+      lexRuntime.postText(params, function(err, data) {
+        if (err) {
+          console.log('Error sending message to Lex:', err);
+        } else {
+          // Display Lex response
+          displayMessage(data.message);
+
+          // Handle Lex responses
+          if (data.intentName === 'AddTask') {
+            addTaskToList(data.slots.TaskName);
+          } else if (data.intentName === 'ViewTasks') {
+            viewTasks();
+          } else if (data.intentName === 'MarkTask') {
+            markTaskCompleted(data.slots.TaskName);
+          }
+        }
+      });
     }
 
-    // Fetch and render tasks from DynamoDB
-    function fetchTasks() {
-        const AWS = require('aws-sdk');
-        const docClient = new AWS.DynamoDB.DocumentClient();
-
-        const params = {
-            TableName: 'Tasks',
-        };
-
-        docClient.scan(params, function (err, data) {
-            if (err) {
-                console.log("Error fetching tasks: ", JSON.stringify(err, null, 2));
-            } else {
-                renderTasks(data.Items);
-            }
-        });
+    function displayMessage(message) {
+      const chat = document.getElementById('chat');
+      const messageDiv = document.createElement('div');
+      messageDiv.innerText = message;
+      chat.appendChild(messageDiv);
     }
 
-    fetchTasks(); // Fetch tasks when page loads
-</script>
+    let tasks = [];
+
+    function addTaskToList(taskName) {
+      tasks.push({ name: taskName, completed: false });
+      renderTasks();
+    }
+
+    function viewTasks() {
+      let taskListMessage = 'Here are your tasks:\n';
+      tasks.forEach(task => {
+        taskListMessage += `${task.name} - ${task.completed ? 'Completed' : 'Pending'}\n`;
+      });
+      displayMessage(taskListMessage);
+    }
+
+    function markTaskCompleted(taskName) {
+      const task = tasks.find(t => t.name === taskName);
+      if (task) {
+        task.completed = true;
+        renderTasks();
+        displayMessage(`Task "${taskName}" marked as completed.`);
+      } else {
+        displayMessage(`Task "${taskName}" not found.`);
+      }
+    }
+
+    function renderTasks() {
+      const taskList = document.getElementById('taskList');
+      taskList.innerHTML = '';
+      tasks.forEach(task => {
+        const taskDiv = document.createElement('div');
+        taskDiv.classList.add('task');
+        taskDiv.innerHTML = `${task.name} - ${task.completed ? 'Completed' : 'Pending'}`;
+        taskList.appendChild(taskDiv);
+      });
+    }
+  </script>
 
 </body>
 </html>
+
