@@ -169,13 +169,13 @@
         });
     }
 
-    // Amazon Lex Chatbox Setup
-    const lexSettings = {
-        botName: 'YourBotName',  // Replace with your Lex Bot name
-        botAlias: '$LATEST', // Replace with your Lex Bot alias
-        region: 'us-west-2',  // Replace with your AWS region
-        identityPoolId: 'us-west-2:YOUR_IDENTITY_POOL_ID'  // Replace with your Cognito Identity Pool ID
-    };
+   const lexSettings = {
+    botName: 'TaskManagerBot',  // Your Lex bot name
+    botAlias: 'TSTALIASID',     // Your Lex bot alias
+    region: 'us-west-2',        // Your AWS region
+    identityPoolId: 'us-west-2:0177e1c7-4f8b-43b7-b9c9-d5593334ca5a'  // Your Cognito Identity Pool ID
+};
+
 
     const chatWidget = new AmazonLexWebUi.Widget(lexSettings);
     chatWidget.render();
