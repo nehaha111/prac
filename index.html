@@ -3,92 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Manager</title>
-    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1194.0.min.js"></script>
-    <script src="https://lex-web-ui.us-east-1.amazonaws.com/v1.js"></script> <!-- Use correct region -->
+    <title>Task Manager with Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .task-manager {
+            margin: 20px;
+        }
+
+        button {
+            margin-top: 10px;
+        }
+
+        .chatbox {
+            position: fixed;
+            bottom: 0;
+            right: 20px;
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 10px;
+            width: 300px;
+        }
+
+        .chat-log {
+            height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Task Management</h1>
+    <!-- Task Manager Section -->
+    <div class="task-manager">
+        <h1>Task Manager</h1>
+        <div class="task-list" id="task-list"></div>
+        <button onclick="showAddTaskForm()">Add Task</button>
 
-    <!-- Chatbot UI for Lex -->
-    <div id="chatbot"></div>
+        <div id="add-task-form" style="display:none;">
+            <input type="text" id="task-input" placeholder="New Task">
+            <button onclick="addTask()">Add</button>
+            <button onclick="hideAddTaskForm()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Chatbox Section -->
+    <div class="chatbox">
+        <div id="chat-log" class="chat-log"></div>
+        <input type="text" id="chat-input" placeholder="Ask me something...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <!-- Include AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1194.0.min.js"></script>
 
     <script>
-        // Lex Bot Configuration
-        const lexSettings = {
-            botName: 'TaskManagerBot',  // Your Lex Bot name
-            botAlias: 'TSTALIASID',     // Your Lex Bot Alias
-            region: 'us-west-2',        // AWS region
-            identityPoolId: 'us-west-2:0177e1c7-4f8b-43b7-b9c9-d5593334ca5a'  // Cognito Identity Pool ID
-        };
+        // Task Management Functions
+        let tasks = [];
 
-        // Initialize Lex Web UI
-        const lexWebUi = new LexWebUi({
-            botName: lexSettings.botName,
-            botAlias: lexSettings.botAlias,
-            region: lexSettings.region,
-            identityPoolId: lexSettings.identityPoolId
-        });
+        function showAddTaskForm() {
+            document.getElementById("add-task-form").style.display = 'block';
+        }
 
-        lexWebUi.init();  // Initialize the Lex Web UI
+        function hideAddTaskForm() {
+            document.getElementById("add-task-form").style.display = 'none';
+        }
 
-        // Example: Task storage using DynamoDB
-        AWS.config.update({
-            region: lexSettings.region
-        });
+        function addTask() {
+            const taskInput = document.getElementById("task-input").value;
+            if (taskInput) {
+                tasks.push(taskInput);
+                renderTasks();
+                document.getElementById("task-input").value = '';
+                hideAddTaskForm();
+            }
+        }
 
-        const dynamoDB = new AWS.DynamoDB.DocumentClient();
-        
-        // Function to add a task to DynamoDB
-        function addTaskToDB(taskName) {
-            const params = {
-                TableName: "Tasks",  // Make sure you create a "Tasks" table in DynamoDB
-                Item: {
-                    TaskID: Date.now().toString(),
-                    TaskName: taskName,
-                    Status: 'Pending'
-                }
-            };
-
-            dynamoDB.put(params, function(err, data) {
-                if (err) {
-                    console.error("Error adding task: ", err);
-                } else {
-                    console.log("Task added successfully: ", data);
-                }
+        function renderTasks() {
+            const taskList = document.getElementById("task-list");
+            taskList.innerHTML = '';
+            tasks.forEach((task, index) => {
+                taskList.innerHTML += `<div>${task} <button onclick="deleteTask(${index})">Delete</button></div>`;
             });
         }
 
-        // Lex function to handle input from the user (e.g., adding a task)
-        function handleLexBotResponse(userInput) {
-            const params = {
-                botName: lexSettings.botName,
-                botAlias: lexSettings.botAlias,
-                userId: 'user123',  // Unique user ID
-                inputText: userInput
-            };
+        function deleteTask(index) {
+            tasks.splice(index, 1);
+            renderTasks();
+        }
 
-            const lexRuntime = new AWS.LexRuntime();
-            lexRuntime.postText(params, function(err, data) {
-                if (err) {
-                    console.log("Error:", err);
-                } else {
-                    console.log("Lex Bot response:", data);
-                    if (data.dialogState === 'ReadyForFulfillment') {
-                        // Add task logic after Lex confirms fulfillment
-                        if (data.intentName === 'AddTaskIntent') {
-                            const taskName = data.slots.TaskName;
-                            addTaskToDB(taskName);  // Add task to DynamoDB
-                        }
+        // Amazon Lex Chatbot Integration
+        AWS.config.region = 'us-east-1';  // Set your region
+        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+            IdentityPoolId: 'YOUR_IDENTITY_POOL_ID',
+        });
+
+        var lexRuntime = new AWS.LexRuntime();
+
+        function sendMessage() {
+            const userMessage = document.getElementById("chat-input").value;
+            if (userMessage.trim()) {
+                addMessageToChatLog("You: " + userMessage);
+                document.getElementById("chat-input").value = '';
+
+                // Call Lex bot
+                var params = {
+                    botAlias: 'TestBotAlias',
+                    botName: 'TaskManagerBot',
+                    inputText: userMessage,
+                    userId: 'user',  // User ID can be dynamic
+                };
+
+                lexRuntime.postText(params, function (err, data) {
+                    if (err) {
+                        console.log(err, err.stack);
+                        addMessageToChatLog("Bot: Sorry, I couldn't understand that.");
+                    } else {
+                        addMessageToChatLog("Bot: " + data.message);
                     }
-                }
-            });
+                });
+            }
         }
 
-        // Example: Send a message to Lex (this could be done via the UI input)
-        // For testing purposes, you can trigger this function
-        handleLexBotResponse("Add a new task to complete the project");
-
+        function addMessageToChatLog(message) {
+            const chatLog = document.getElementById("chat-log");
+            chatLog.innerHTML += `<div>${message}</div>`;
+            chatLog.scrollTop = chatLog.scrollHeight;  // Scroll to the bottom
+        }
     </script>
 </body>
 </html>
+
