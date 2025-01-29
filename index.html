@@ -147,7 +147,14 @@
                         addMessageToChatLog("Bot: Sorry, I couldn't understand that.");
                     } else {
                         console.log(data);  // Log the response data for debugging
-                        addMessageToChatLog("Bot: " + data.message);  // Display Lex's response
+
+                        // If Lex responds with a prompt for task name
+                        if (data.message.includes("What is the name of your task?")) {
+                            addMessageToChatLog("Bot: " + data.message);
+                        } else {
+                            // General response
+                            addMessageToChatLog("Bot: " + data.message);
+                        }
                     }
                 });
             }
