@@ -19,12 +19,14 @@
 
         .chatbox {
             position: fixed;
-            bottom: 0;
-            right: 20px;
+            bottom: 10px; /* Adjusted for better visibility */
+            right: 10px;  /* Adjusted for better visibility */
             background: #f1f1f1;
             padding: 10px;
             border-radius: 10px;
             width: 300px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Added shadow for better visibility */
+            z-index: 9999;  /* Ensure it stays on top of other content */
         }
 
         .chat-log {
@@ -34,6 +36,27 @@
             background: white;
             padding: 10px;
             border-radius: 5px;
+            border: 1px solid #ccc; /* Added border for visibility */
+        }
+
+        .chatbox input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 10px;
+        }
+
+        .chatbox button {
+            margin-top: 10px;
+            width: 100%;
+            padding: 8px;
+            background-color: #4CAF50; /* Button color */
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+
+        .chatbox button:hover {
+            background-color: #45a049; /* Hover effect */
         }
     </style>
 </head>
@@ -41,4 +64,100 @@
     <!-- Task Manager Section -->
     <div class="task-manager">
         <h1>Task Manager</h1>
-      
+        <div class="task-list" id="task-list"></div>
+        <button onclick="showAddTaskForm()">Add Task</button>
+
+        <div id="add-task-form" style="display:none;">
+            <input type="text" id="task-input" placeholder="New Task">
+            <button onclick="addTask()">Add</button>
+            <button onclick="hideAddTaskForm()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Chatbox Section -->
+    <div class="chatbox" id="chatbox">
+        <div id="chat-log" class="chat-log"></div>
+        <input type="text" id="chat-input" placeholder="Ask me something...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <!-- Include AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1194.0.min.js"></script>
+
+    <script>
+        // Task Management Functions
+        let tasks = [];
+
+        function showAddTaskForm() {
+            document.getElementById("add-task-form").style.display = 'block';
+        }
+
+        function hideAddTaskForm() {
+            document.getElementById("add-task-form").style.display = 'none';
+        }
+
+        function addTask() {
+            const taskInput = document.getElementById("task-input").value;
+            if (taskInput) {
+                tasks.push(taskInput);
+                renderTasks();
+                document.getElementById("task-input").value = '';
+                hideAddTaskForm();
+            }
+        }
+
+        function renderTasks() {
+            const taskList = document.getElementById("task-list");
+            taskList.innerHTML = '';
+            tasks.forEach((task, index) => {
+                taskList.innerHTML += `<div>${task} <button onclick="deleteTask(${index})">Delete</button></div>`;
+            });
+        }
+
+        function deleteTask(index) {
+            tasks.splice(index, 1);
+            renderTasks();
+        }
+
+        // Amazon Lex Chatbot Integration
+        AWS.config.region = 'us-east-1';  // Set your region
+        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+            IdentityPoolId: 'WWGFSAOGNU',  // Correct Cognito Identity Pool ID
+        });
+
+        var lexRuntime = new AWS.LexRuntime();
+
+        function sendMessage() {
+            const userMessage = document.getElementById("chat-input").value;
+            if (userMessage.trim()) {
+                addMessageToChatLog("You: " + userMessage);
+                document.getElementById("chat-input").value = '';
+
+                // Call Lex bot
+                var params = {
+                    botAlias: 'TestBotAlias',      // Correct Bot Alias Name
+                    botName: 'TaskManagerBot',     // Correct Bot Name
+                    inputText: userMessage,        // User's message to the bot
+                    userId: 'user',                // User ID (can be dynamic)
+                };
+
+                lexRuntime.postText(params, function (err, data) {
+                    if (err) {
+                        console.log(err, err.stack);  // Log error if any
+                        addMessageToChatLog("Bot: Sorry, I couldn't understand that.");
+                    } else {
+                        console.log(data);  // Log the response data for debugging
+                        addMessageToChatLog("Bot: " + data.message);  // Display Lex's response
+                    }
+                });
+            }
+        }
+
+        function addMessageToChatLog(message) {
+            const chatLog = document.getElementById("chat-log");
+            chatLog.innerHTML += `<div>${message}</div>`;
+            chatLog.scrollTop = chatLog.scrollHeight;  // Scroll to the bottom of chat log
+        }
+    </script>
+</body>
+</html>
