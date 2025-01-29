@@ -99,7 +99,7 @@
         // Amazon Lex Chatbot Integration
         AWS.config.region = 'us-east-1';  // Set your region
         AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-            IdentityPoolId: 'WWGFSAOGNU',
+            IdentityPoolId: 'WWGFSAOGNU',  // Cognito Identity Pool ID (Your Cognito Pool ID)
         });
 
         var lexRuntime = new AWS.LexRuntime();
@@ -112,18 +112,19 @@
 
                 // Call Lex bot
                 var params = {
-                    botAlias: 'TestBotAlias',
-                    botName: 'TaskManagerBot',
-                    inputText: userMessage,
-                    userId: 'user',  // User ID can be dynamic
+                    botAlias: 'TSTALIASID',      // Correct Bot Alias ID
+                    botName: 'TaskManagerBot',   // Correct Bot Name (ID)
+                    inputText: userMessage,      // User's message to the bot
+                    userId: 'user',              // User ID (can be dynamic or static)
                 };
 
                 lexRuntime.postText(params, function (err, data) {
                     if (err) {
-                        console.log(err, err.stack);
+                        console.log(err, err.stack);  // Log error if any
                         addMessageToChatLog("Bot: Sorry, I couldn't understand that.");
                     } else {
-                        addMessageToChatLog("Bot: " + data.message);
+                        console.log(data);  // Log the response data for debugging
+                        addMessageToChatLog("Bot: " + data.message);  // Display Lex's response
                     }
                 });
             }
@@ -132,9 +133,8 @@
         function addMessageToChatLog(message) {
             const chatLog = document.getElementById("chat-log");
             chatLog.innerHTML += `<div>${message}</div>`;
-            chatLog.scrollTop = chatLog.scrollHeight;  // Scroll to the bottom
+            chatLog.scrollTop = chatLog.scrollHeight;  // Scroll to the bottom of chat log
         }
     </script>
 </body>
 </html>
-
